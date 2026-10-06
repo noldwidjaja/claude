@@ -11,6 +11,10 @@ const BAR_CELLS = 20
 const figures = atom({ plugin: 'usage-status', key: 'figures' } as const, null)
 const now = atom({ plugin: 'usage-status', key: 'now' } as const, 0)
 const isCompacting = atom({ plugin: 'usage-status', key: 'isCompacting' } as const, false)
+const hasLimits = atom({ plugin: 'usage-status', key: 'hasLimits' } as const, false)
+
+// The windows every subscription has, shown even when a reading leaves one out.
+const KINDS = ['five_hour', 'seven_day']
 
 const label = (r: Limit) => LABELS[r.kind] ?? r.kind
 
@@ -31,6 +35,19 @@ export function bar(hp: number): { full: string; empty: string } {
   const filled = Math.ceil((hp / 100) * BAR_CELLS)
 
   return { full: '█'.repeat(filled), empty: '░'.repeat(BAR_CELLS - filled) }
+}
+
+// The windows to draw: the subscription's own always (a fresh window is often left out of a
+// reading), and one whose reset has passed as full, until a reading says otherwise.
+export function windowsOf(reported: readonly Limit[], isSubscribed: boolean, at: number): Limit[] {
+  const kinds = isSubscribed ? [...new Set([...KINDS, ...reported.map(r => r.kind)])] : reported.map(r => r.kind)
+
+  return kinds.map(kind => {
+    const r = reported.find(one => one.kind === kind)
+    const isReset = r?.resetsAt !== undefined && Date.parse(r.resetsAt) <= at
+
+    return r === undefined || isReset ? { kind, percentUsed: 0 } : r
+  })
 }
 
 export function untilReset(resetsAt: string, at: number): string {
@@ -60,12 +77,20 @@ async function measured($: Parameters<Hook<'session.measure'>>[0], next: Figures
       $.ui.toast(`${label(r)} at ${hpOf(r)} HP left`)
     }
   }
+
+  // Kept across sessions, so a new session shows the bars before its first reading.
+  if (next.rateLimits.length > 0) {
+    await $.store.set('hasLimits', true)
+    await update($, hasLimits, () => true)
+  }
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     // The bars replace the text line older versions pinned.
     $.ui.status(undefined)
+    const stored = await $.store.get('hasLimits')
+    await update($, hasLimits, () => stored === true)
     await measured($, await $.session.usage())
     // Redraw each minute so the countdowns stay current.
     $.clock.every(MINUTE, () => void $.clock.now().then(t => update($, now, () => t)))
@@ -81,13 +106,14 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const shown = await read($, figures)
+    const at = (await read($, now)) || (await $.clock.now())
+    const windows = windowsOf(shown?.rateLimits ?? [], await read($, hasLimits), at)
     const percent = shown?.context.percent
 
-    if (e.props.hasSurvey || shown === null || (shown.rateLimits.length === 0 && percent === undefined)) {
+    if (e.props.hasSurvey || (windows.length === 0 && percent === undefined)) {
       return next(e)
     }
 
-    const at = (await read($, now)) || (await $.clock.now())
     const { Box, Button, Text } = $.ui.resolve(e)
 
     const compact = async () => {
@@ -139,7 +165,7 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        {shown.rateLimits.map(r => {
+        {windows.map(r => {
           const hp = hpOf(r)
           const note = r.resetsAt === undefined ? undefined : untilReset(r.resetsAt, at)
 

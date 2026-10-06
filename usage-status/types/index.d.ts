@@ -4,6 +4,6 @@ export type Figures = { context: { window: number; tokens?: number; percent?: nu
 
 declare module 'claude-code' {
   interface PluginState {
-    'usage-status': { figures: Figures | null; now: number; isCompacting: boolean }
+    'usage-status': { figures: Figures | null; now: number; isCompacting: boolean; hasLimits: boolean }
   }
 }

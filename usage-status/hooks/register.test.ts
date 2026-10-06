@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { bar, hpColor, untilReset } from './register'
+import { bar, hpColor, untilReset, windowsOf } from './register'
 
 const NOW = Date.parse('2026-10-06T12:00:00Z')
 
@@ -20,6 +20,7 @@ test('each limit is an HP bar with its reset countdown', async ($, on) => {
   const toasts: string[] = []
   on('ui.toast', ($, e) => (toasts.push(e.text), { value: undefined }))
   on('session.measure', ($, e) => ({ changed: e.changed }))
+  on('store.set', () => ({ value: undefined }))
   mock.clock(on, { now: NOW })
 
   const measure = (percentUsed: number) =>
@@ -78,6 +79,38 @@ test('the ctx row has a Compact button, hidden while a turn runs', async ($, on)
 
   expect(compactions).toBe(2)
   expect(toasts).toEqual(["Didn't compact: nothing to compact", "Didn't compact: nothing to compact"])
+})
+
+test('a window left out of a reading, or past its reset, shows full', async ($, on) => {
+  on('session.measure', ($, e) => ({ changed: e.changed }))
+  on('store.set', () => ({ value: undefined }))
+  mock.clock(on, { now: NOW })
+
+  const measure = (rateLimits: { kind: string; percentUsed: number; resetsAt?: string }[]) =>
+    $.session.measure({ context: { window: 200000 }, rateLimits, changed: ['rateLimits'] })
+
+  await measure([{ kind: 'seven_day', percentUsed: 41 }])
+  await measure([])
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'usage-status', surface, ...BAND })
+    expect(await ui.find({ text: '5h' })).toBeDefined()
+    expect(await ui.find({ text: '7d' })).toBeDefined()
+    expect(await ui.find({ text: '100 HP' })).toBeDefined()
+    expect(await ui.find({ text: '█'.repeat(20) })).toBeDefined()
+    await ui.unmount()
+  }
+})
+
+test('which windows draw', () => {
+  const past = new Date(NOW - 60_000).toISOString()
+  const soon = new Date(NOW + 60_000).toISOString()
+
+  expect(windowsOf([], false, NOW)).toEqual([])
+  expect(windowsOf([], true, NOW)).toEqual([{ kind: 'five_hour', percentUsed: 0 }, { kind: 'seven_day', percentUsed: 0 }])
+  expect(windowsOf([{ kind: 'five_hour', percentUsed: 80, resetsAt: past }], true, NOW)[0]).toEqual({ kind: 'five_hour', percentUsed: 0 })
+  expect(windowsOf([{ kind: 'five_hour', percentUsed: 80, resetsAt: soon }], true, NOW)[0]?.percentUsed).toBe(80)
+  expect(windowsOf([{ kind: 'spend_limit', percentUsed: 5 }], true, NOW).map(w => w.kind)).toEqual(['five_hour', 'seven_day', 'spend_limit'])
 })
 
 test('the bar empties and reddens as HP drops', () => {
