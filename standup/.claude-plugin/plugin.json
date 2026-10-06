@@ -1,0 +1,14 @@
+{
+  "name": "standup",
+  "version": "0.1.0",
+  "description": "/standup summarizes your commits across your repos into an update you can paste",
+  "author": { "name": "Arnold Widjaja" },
+  "userConfig": {
+    "reposRoot": {
+      "type": "string",
+      "title": "Repos folder",
+      "description": "The folder /standup searches for git repos, up to two levels deep",
+      "default": "~/dev"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "usage-status",
+  "version": "0.2.0",
+  "description": "Plan usage as HP bars above the prompt, with when each limit resets",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Arnold Widjaja"
+  }
+}

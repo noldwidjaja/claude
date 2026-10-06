@@ -1,0 +1,21 @@
+{
+  "name": "claude-mods",
+  "owner": {
+    "name": "Arnold Widjaja"
+  },
+  "metadata": {
+    "description": "Arnold's Claude Code mods"
+  },
+  "plugins": [
+    {
+      "name": "usage-status",
+      "source": "./usage-status",
+      "description": "Plan usage as HP bars above the prompt, with when each limit resets"
+    },
+    {
+      "name": "standup",
+      "source": "./standup",
+      "description": "/standup summarizes your commits across your repos into an update you can paste"
+    }
+  ]
+}
