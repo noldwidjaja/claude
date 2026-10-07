@@ -16,6 +16,11 @@
       "name": "standup",
       "source": "./standup",
       "description": "/standup summarizes your commits across your repos into an update you can paste"
+    },
+    {
+      "name": "plan-view",
+      "source": "./plan-view",
+      "description": "The plan as rendered markdown in a pane beside the conversation, opened when Claude asks for approval"
     }
   ]
 }

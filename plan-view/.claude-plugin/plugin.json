@@ -1,0 +1,9 @@
+{
+  "name": "plan-view",
+  "version": "0.1.0",
+  "description": "The plan as rendered markdown in a pane beside the conversation, opened when Claude asks for approval",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Arnold Widjaja"
+  }
+}
