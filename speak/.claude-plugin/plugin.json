@@ -2,13 +2,27 @@
   "name": "speak",
   "version": "0.1.0",
   "description": "/speak speaks a summary of Claude's answer when a turn ends, in the sessions you turn it on for",
-  "author": { "name": "Arnold Widjaja" },
+  "author": {
+    "name": "Arnold Widjaja"
+  },
   "types": "./types/index.d.ts",
   "userConfig": {
+    "kokoroFolder": {
+      "type": "string",
+      "title": "Kokoro folder",
+      "description": "Where Kokoro is installed (its Python in bin/, kokoro-v1.0.onnx and voices-v1.0.bin); empty to always use macOS say",
+      "default": "~/.claude/kokoro"
+    },
+    "kokoroVoice": {
+      "type": "string",
+      "title": "Kokoro voice",
+      "description": "A Kokoro voice, e.g. af_bella, af_heart, am_michael, bf_emma",
+      "default": "af_bella"
+    },
     "voice": {
       "type": "string",
-      "title": "Voice",
-      "description": "A macOS voice name, as `say -v '?'` lists them (e.g. Samantha); empty for the system default",
+      "title": "say voice",
+      "description": "The macOS voice used when Kokoro isn't available, as `say -v '?'` lists them (e.g. Ava (Premium)); empty for the system default",
       "default": ""
     }
   }

@@ -15,15 +15,23 @@ const ran = { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: f
 
 type On = Parameters<TestBody>[1]
 
-// The engine beneath the plugin: the model answers `summary` (or fails), and `say` prints its
-// PID and runs until `kill` names it. Each spoken text, voice and kill is recorded.
-const engine = (on: On, summary: string | null = 'All tests pass now.') => {
+// The engine beneath the plugin: the model answers `summary` (or fails); `say` prints its PID
+// and runs until `kill` names it; Kokoro's server (absent, or not installed, when `kokoro` says)
+// says READY and runs until killed, its /speak answering at once when `isQuick`, else once /stop
+// is posted. Each spoken text, voice, kill, server and post is recorded.
+const engine = (on: On, summary: string | null = 'All tests pass now.', kokoro = { isInstalled: true, isQuick: true }) => {
   const spoken: { text: string; voice: string }[] = []
   const killed: string[] = []
   const prompts: string[] = []
+  const servers: string[][] = []
+  const posts: { url: string; body: string }[] = []
   let started = () => {}
   let isStarted = new Promise<void>(resolve => (started = resolve))
+  let speaking = () => {}
+  let isSpeaking = new Promise<void>(resolve => (speaking = resolve))
   let ended = () => {}
+  let killServer = () => {}
+  let stopSpeech = () => {}
 
   on('turn.complete', ($, e) => ({ text: e.answer }))
   on('prompt.submit', ($, e) => ({ text: e.text }) as never)
@@ -38,6 +46,21 @@ const engine = (on: On, summary: string | null = 'All tests pass now.') => {
       : { value: { isAnswered: true as const, text: summary, usage: ZERO } }
   ))
   on('process.spawn', async function* ($, e) {
+    if (e.argv[3] === 'kokoro') {
+      servers.push([...e.argv.slice(3, 5)])
+
+      if (!kokoro.isInstalled) {
+        yield { stream: 'stderr' as const, text: 'sh: ./bin/python: No such file or directory\n' }
+        return { value: { code: 127, signal: null } }
+      }
+
+      const isKilled = new Promise<void>(resolve => (killServer = resolve))
+      yield { stream: 'stdout' as const, text: 'READY 777 /tmp/speak/kokoro.sock\n' }
+      await isKilled
+
+      return { value: { code: null, signal: 'SIGTERM' } }
+    }
+
     spoken.push({ text: e.input ?? '', voice: e.argv.at(-1) ?? '' })
     const isEnded = new Promise<void>(resolve => (ended = resolve))
     yield { stream: 'stdout' as const, text: '4242\n' }
@@ -46,21 +69,53 @@ const engine = (on: On, summary: string | null = 'All tests pass now.') => {
 
     return { value: { code: null, signal: 'SIGTERM' } }
   })
-  on('process.run', ($, e) => (killed.push(e.argv.join(' ')), ended(), ran))
+  on('process.run', ($, e) => {
+    const command = e.argv.join(' ')
+    killed.push(command)
+    ;(command === 'kill 777' ? killServer : ended)()
+
+    return ran
+  })
+  on('http.fetch', async ($, e) => {
+    posts.push({ url: e.url, body: e.init?.body ?? '' })
+
+    if (e.url.endsWith('/stop')) {
+      stopSpeech()
+      return { value: { status: 200, ok: true, headers: {}, text: 'stopped' } }
+    }
+
+    const isStopped = new Promise<void>(resolve => (stopSpeech = resolve))
+    speaking()
+
+    if (!kokoro.isQuick) {
+      await isStopped
+    }
+
+    return { value: { status: 200, ok: true, headers: {}, text: kokoro.isQuick ? 'done' : 'stopped' } }
+  })
 
   return {
     spoken,
     killed,
     prompts,
+    servers,
+    posts,
     started: async () => {
       await isStarted
       isStarted = new Promise<void>(resolve => (started = resolve))
     },
+    speaking: async () => {
+      await isSpeaking
+      isSpeaking = new Promise<void>(resolve => (speaking = resolve))
+    },
   }
 }
 
+// Kokoro left out: these speak with macOS say.
+const SAY_ONLY = { options: { kokoroFolder: '' } }
+
 describe('/speak', () => {
-  test("speaks a summary of the answer once on, and nothing while off", async ($, on) => {
+  test("speaks a summary of the answer once on, and nothing while off", SAY_ONLY, async ($, on) => {
     const say = engine(on)
 
     await $.turn.complete(answered('Before.'))
@@ -78,7 +133,7 @@ describe('/speak', () => {
     expect(say.spoken.length).toBe(1)
   })
 
-  test('a new prompt stops the speech', async ($, on) => {
+  test('a new prompt stops the speech', SAY_ONLY, async ($, on) => {
     const say = engine(on)
 
     await $.command.run(typed('on'))
@@ -89,7 +144,7 @@ describe('/speak', () => {
     expect(say.killed).toEqual(['kill 4242'])
   })
 
-  test("falls back to the answer's opening when the model can't summarize", async ($, on) => {
+  test("falls back to the answer's opening when the model can't summarize", SAY_ONLY, async ($, on) => {
     const say = engine(on, null)
 
     await $.command.run(typed('on'))
@@ -100,7 +155,7 @@ describe('/speak', () => {
     await $.command.run(typed('off'))
   })
 
-  test("skips subagents', interrupted and code-only turns", async ($, on) => {
+  test("skips subagents', interrupted and code-only turns", SAY_ONLY, async ($, on) => {
     const say = engine(on)
 
     await $.command.run(typed('on'))
@@ -111,7 +166,7 @@ describe('/speak', () => {
     expect(say.prompts).toEqual([])
   })
 
-  test('passes the configured voice', { options: { voice: 'Samantha' } }, async ($, on) => {
+  test('passes the configured voice', { options: { kokoroFolder: '', voice: 'Samantha' } }, async ($, on) => {
     const say = engine(on)
 
     await $.command.run(typed('on'))
@@ -122,7 +177,7 @@ describe('/speak', () => {
     await $.command.run(typed('off'))
   })
 
-  test('/speak log shows each step', async ($, on) => {
+  test('/speak log shows each step', SAY_ONLY, async ($, on) => {
     const say = engine(on)
 
     expect((await $.command.run(typed('log'))).text).toBe('Nothing logged yet in this session.')
@@ -143,7 +198,7 @@ describe('/speak', () => {
     expect(lines).toContain('stopping: new prompt')
   })
 
-  test('the button above the prompt turns it on and off', async ($, on) => {
+  test('the button above the prompt turns it on and off', SAY_ONLY, async ($, on) => {
     const say = engine(on)
     // The engine draws nothing of its own in the band.
     on('ui.render', ($, e) => h($.ui.resolve(e).Box, {}) as RenderElement)
@@ -169,9 +224,50 @@ describe('/speak', () => {
     }
   })
 
-  test('rejects other arguments', async ($, on) => {
+  test('rejects other arguments', SAY_ONLY, async ($, on) => {
     engine(on)
     expect((await $.command.run(typed('loud'))).text).toBe('Usage: /speak [on | off | log]')
+  })
+})
+
+describe('Kokoro', () => {
+  test('loads when turned on, speaks the summary as Bella, and shuts down when off', async ($, on) => {
+    const kokoro = engine(on)
+
+    await $.command.run(typed('on'))
+    await $.turn.complete(answered('Done.'))
+    await kokoro.speaking()
+    expect(kokoro.servers).toEqual([['kokoro', '~/.claude/kokoro']])
+    expect(kokoro.posts).toEqual([{ url: 'http://kokoro/speak?voice=af_bella', body: 'All tests pass now.' }])
+    expect(kokoro.spoken).toEqual([])
+
+    await $.command.run(typed('off'))
+    expect(kokoro.killed).toContain('kill 777')
+  })
+
+  test('a new prompt stops it mid-speech', async ($, on) => {
+    const kokoro = engine(on, undefined, { isInstalled: true, isQuick: false })
+
+    await $.command.run(typed('on'))
+    await $.turn.complete(answered('A long answer.'))
+    await kokoro.speaking()
+    await $.prompt.submit({ text: 'next' } as never)
+
+    expect(kokoro.posts.at(-1)?.url).toBe('http://kokoro/stop')
+    await $.command.run(typed('off'))
+  })
+
+  test('falls back to say when Kokoro is not installed', async ($, on) => {
+    const kokoro = engine(on, undefined, { isInstalled: false, isQuick: true })
+
+    await $.command.run(typed('on'))
+    await $.turn.complete(answered('Done.'))
+    await kokoro.started()
+
+    expect(kokoro.spoken).toEqual([{ text: 'All tests pass now.', voice: '' }])
+    const log = (await $.command.run(typed('log'))).text ?? ''
+    expect(log).toContain('kokoro server ended: sh: ./bin/python: No such file or directory')
+    await $.command.run(typed('off'))
   })
 })
 
