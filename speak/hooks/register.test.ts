@@ -224,9 +224,52 @@ describe('/speak', () => {
     }
   })
 
+  test('the replay button says the last summary again, without asking the model', SAY_ONLY, async ($, on) => {
+    const say = engine(on)
+    on('ui.render', ($, e) => h($.ui.resolve(e).Box, {}) as RenderElement)
+    const band = await $.ui.mount({
+      plugin: 'speak',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 80, scroll: { offset: 0, bodyRows: 9 } } as never,
+    })
+
+    expect(await band.find({ key: 'speak-replay' })).toBeUndefined()
+    await band.press({ key: 'speak' })
+    await band.press({ key: 'speak-replay' })
+    expect(say.spoken).toEqual([])
+
+    await $.turn.complete(answered('Done.'))
+    await say.started()
+    await band.press({ key: 'speak-replay' })
+    await say.started()
+
+    expect(say.killed).toEqual(['kill 4242'])
+    expect(say.prompts.length).toBe(1)
+    expect(say.spoken.map(s => s.text)).toEqual(['All tests pass now.', 'All tests pass now.'])
+
+    await band.press({ key: 'speak' })
+    expect(await band.find({ key: 'speak-replay' })).toBeUndefined()
+    await band.unmount()
+  })
+
+  test('/speak replay', SAY_ONLY, async ($, on) => {
+    const say = engine(on)
+
+    expect((await $.command.run(typed('replay'))).text).toBe('Nothing to replay yet in this session.')
+    await $.command.run(typed('on'))
+    await $.turn.complete(answered('Done.'))
+    await say.started()
+    expect((await $.command.run(typed('replay'))).text).toBe('Replaying the last summary.')
+    await say.started()
+
+    expect(say.spoken.length).toBe(2)
+    await $.command.run(typed('off'))
+  })
+
   test('rejects other arguments', SAY_ONLY, async ($, on) => {
     engine(on)
-    expect((await $.command.run(typed('loud'))).text).toBe('Usage: /speak [on | off | log]')
+    expect((await $.command.run(typed('loud'))).text).toBe('Usage: /speak [on | off | replay | log]')
   })
 })
 

@@ -6,9 +6,11 @@ const isOn = atom({ plugin: 'speak', key: 'isOn' } as const, false)
 // The session's last steps, newest last, for /speak log.
 const log = atom({ plugin: 'speak', key: 'log' } as const, [])
 const LOG_LINES = 30
+// The last summary spoken, for the replay button; empty before the first.
+const last = atom({ plugin: 'speak', key: 'last' } as const, '')
 
 const STATUS = '🔊 speaking answers · /speak off'
-const USAGE = 'Usage: /speak [on | off | log]'
+const USAGE = 'Usage: /speak [on | off | replay | log]'
 
 const SYSTEM = `You write the spoken update a coding assistant gives when it finishes, for a developer who may be away from the screen.
 The assistant's reply comes inside <reply> tags. From it, say only what matters:
@@ -331,7 +333,12 @@ async function say($: EngineInterface, answer: string, voices: Voices, signal: A
   const summary = isSummarized ? reply.text.trim() : opening(answer)
   const why = reply.isAnswered ? 'empty reply' : reply.reason === 'api-error' ? `api-error ${reply.status}` : reply.reason
   await note($, isSummarized ? `summarized ${answer.length} chars in ${took}: ${summary}` : `no summary (${why}) after ${took}; speaking the opening: ${summary}`)
+  await update($, last, () => summary)
+  await speak($, summary, voices, signal)
+}
 
+// Speaks a summary with Kokoro when it can and say when not, until `signal` aborts.
+async function speak($: EngineInterface, summary: string, voices: Voices, signal: AbortSignal) {
   if (!(await speakWithKokoro($, summary, voices, signal)) && !signal.aborted) {
     await speakWithSay($, summary, voices.say, signal)
   }
@@ -350,6 +357,41 @@ async function stop($: EngineInterface, why: string) {
     current.controller.abort()
     await current.done
   }
+}
+
+// Runs `work` in the background as what is being said, after cutting short what was.
+async function begin($: EngineInterface, why: string, work: (signal: AbortSignal) => Promise<void>) {
+  await stop($, why)
+  const controller = new AbortController()
+
+  const done = work(controller.signal).catch(async (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    await note($, `failed: ${message}`)
+    $.ui.toast(`Couldn't speak: ${message}`)
+  })
+  const current = { controller, done }
+  speaking = current
+  void done.finally(() => {
+    if (speaking === current) {
+      speaking = undefined
+    }
+  })
+}
+
+// Says the last summary again; false when there is none yet.
+async function replay($: EngineInterface, via: string, voices: Voices) {
+  const summary = await read($, last)
+
+  if (summary === '') {
+    return false
+  }
+
+  await begin($, `replay by ${via}`, async signal => {
+    await note($, `replaying: ${summary}`)
+    await speak($, summary, voices, signal)
+  })
+
+  return true
 }
 
 // Turns speaking on or off, from /speak or the button above the prompt.
@@ -399,6 +441,10 @@ export const register: Register = (on, options) => {
       return { text: lines.length === 0 ? 'Nothing logged yet in this session.' : lines.join('\n') }
     }
 
+    if (word === 'replay') {
+      return { text: (await replay($, '/speak replay', voices)) ? 'Replaying the last summary.' : 'Nothing to replay yet in this session.' }
+    }
+
     if (word !== '' && word !== 'on' && word !== 'off') {
       return { text: USAGE }
     }
@@ -409,7 +455,8 @@ export const register: Register = (on, options) => {
     return { text: isNowOn ? "Speaking a summary of Claude's answers in this session." : 'Stopped speaking answers in this session.' }
   })
 
-  // A button above the prompt that turns it on and off; whatever else draws there stays above it.
+  // Buttons above the prompt: one turns it on and off, one says the last summary again while
+  // it's on (or says there's none yet). Whatever else draws there stays above them.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const above = await next(e)
 
@@ -431,6 +478,18 @@ export const register: Register = (on, options) => {
             dimColor={!isNowOn}
             onPress={() => turn($, !isNowOn, 'the button', voices.kokoroFolder)}
           />
+          {isNowOn ? (
+            <Button
+              key="speak-replay"
+              label="↻ Replay"
+              hotkey="r"
+              onPress={async () => {
+                if (!(await replay($, 'the button', voices))) {
+                  $.ui.toast('Nothing to replay yet: the next answer will be.')
+                }
+              }}
+            />
+          ) : null}
         </Box>
       </Box>
     )
@@ -458,22 +517,10 @@ export const register: Register = (on, options) => {
       return result
     }
 
-    await stop($, 'a newer answer')
-    const controller = new AbortController()
-    await note($, `summarizing an answer of ${answer.length} chars`)
-
     // Not awaited: the turn ends now and the summary is spoken behind it.
-    const done = say($, answer, voices, controller.signal).catch(async (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error)
-      await note($, `failed: ${message}`)
-      $.ui.toast(`Couldn't speak: ${message}`)
-    })
-    const current = { controller, done }
-    speaking = current
-    void done.finally(() => {
-      if (speaking === current) {
-        speaking = undefined
-      }
+    await begin($, 'a newer answer', async signal => {
+      await note($, `summarizing an answer of ${answer.length} chars`)
+      await say($, answer, voices, signal)
     })
 
     return result
