@@ -21,6 +21,11 @@
       "name": "plan-view",
       "source": "./plan-view",
       "description": "The plan as rendered markdown in a pane beside the conversation, opened when Claude asks for approval"
+    },
+    {
+      "name": "speak",
+      "source": "./speak",
+      "description": "/speak speaks a summary of Claude's answer when a turn ends, in the sessions you turn it on for"
     }
   ]
 }

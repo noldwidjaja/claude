@@ -1,0 +1,15 @@
+{
+  "name": "speak",
+  "version": "0.1.0",
+  "description": "/speak speaks a summary of Claude's answer when a turn ends, in the sessions you turn it on for",
+  "author": { "name": "Arnold Widjaja" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "voice": {
+      "type": "string",
+      "title": "Voice",
+      "description": "A macOS voice name, as `say -v '?'` lists them (e.g. Samantha); empty for the system default",
+      "default": ""
+    }
+  }
+}
