@@ -1,6 +1,19 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import type { RenderElement } from 'claude-code'
+import type { TestBody } from 'claude-code/testing'
+
 import { bar, hpColor, untilReset, windowsOf } from './register'
+
+type On = Parameters<TestBody>[1]
+
+// What another mod beneath draws in the band, kept under the meters.
+const beneath = (on: On) =>
+  on('ui.render', ($, e) => {
+    const { Box, Text } = $.ui.resolve(e)
+
+    return h(Box, {}, h(Text, {}, 'beneath')) as RenderElement
+  })
 
 const NOW = Date.parse('2026-10-06T12:00:00Z')
 
@@ -17,6 +30,7 @@ const BAND = {
 } as const
 
 test('each limit is an HP bar with its reset countdown', async ($, on) => {
+  beneath(on)
   const toasts: string[] = []
   on('ui.toast', ($, e) => (toasts.push(e.text), { value: undefined }))
   on('session.measure', ($, e) => ({ changed: e.changed }))
@@ -38,6 +52,7 @@ test('each limit is an HP bar with its reset countdown', async ($, on) => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'usage-status', surface, ...BAND })
     expect(await ui.find({ text: '76 HP' })).toBeDefined()
+    expect(await ui.find({ text: 'beneath' })).toBeDefined()
     expect(await ui.find({ text: '59 HP' })).toBeDefined()
     expect(await ui.find({ text: '2h 14m' })).toBeDefined()
     expect(await ui.find({ text: '3d 4h' })).toBeDefined()
@@ -53,6 +68,7 @@ test('each limit is an HP bar with its reset countdown', async ($, on) => {
 })
 
 test('the ctx row has a Compact button, hidden while a turn runs', async ($, on) => {
+  beneath(on)
   let compactions = 0
   const toasts: string[] = []
   on('ui.toast', ($, e) => (toasts.push(e.text), { value: undefined }))
@@ -82,6 +98,7 @@ test('the ctx row has a Compact button, hidden while a turn runs', async ($, on)
 })
 
 test('a window left out of a reading, or past its reset, shows full', async ($, on) => {
+  beneath(on)
   on('session.measure', ($, e) => ({ changed: e.changed }))
   on('store.set', () => ({ value: undefined }))
   mock.clock(on, { now: NOW })

@@ -172,6 +172,8 @@ export const register: Register = on => {
           return meter(r.kind, '♥', label(r), hp, 'HP', hpColor(hp), note)
         })}
         {percent === undefined ? null : meter('context', '⚡', 'ctx', energyOf(percent), 'EN', 'warning', undefined, compactControl)}
+        {/* What other mods draw in the band (speak's button) stays, under the meters. */}
+        {await next(e)}
       </Box>
     )
   })
