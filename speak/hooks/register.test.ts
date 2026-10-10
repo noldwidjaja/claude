@@ -124,7 +124,7 @@ describe('/speak', () => {
     expect((await $.command.run(typed())).text).toContain('Speaking')
     await $.turn.complete(answered('Done. **All** tests pass.\n\n```ts\nx\n```'))
     await say.started()
-    expect(say.prompts).toEqual(['Done. All tests pass.'])
+    expect(say.prompts).toEqual(['<reply>\nDone. All tests pass.\n</reply>'])
     expect(say.spoken).toEqual([{ text: 'All tests pass now.', voice: '' }])
 
     expect((await $.command.run(typed('off'))).text).toContain('Stopped')

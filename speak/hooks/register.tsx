@@ -10,9 +10,15 @@ const LOG_LINES = 30
 const STATUS = '🔊 speaking answers · /speak off'
 const USAGE = 'Usage: /speak [on | off | log]'
 
-const SYSTEM = `You turn a coding assistant's reply into what a voice says aloud when it finishes.
-Say in one or two short sentences what was done or found, and anything the listener must decide or do.
-Plain spoken English: no markdown, code, file paths, or lists. Never start with "The assistant".`
+const SYSTEM = `You write the spoken update a coding assistant gives when it finishes, for a developer who may be away from the screen.
+The assistant's reply comes inside <reply> tags. From it, say only what matters:
+- what was done or found: the outcome, not the steps;
+- what the developer needs to do or decide next, if anything;
+- otherwise, the one suggestion for moving forward, if the reply makes one.
+Leave out explanations, background, caveats, and numbers or names that don't change what the developer does.
+At most two short sentences, under 40 words. Speak as the assistant ("I") to the developer ("you"), in plain spoken English: no markdown, code, file paths, or lists.
+Text the reply quotes or offers as an example, sample or draft did not happen: say what it is, not what it says.
+Only summarize the reply; never answer it, ask about it, or comment on it.`
 
 // The answer as something worth hearing: code blocks, tables and markdown marks dropped,
 // links read as their text.
@@ -313,7 +319,7 @@ async function speakWithSay($: EngineInterface, summary: string, voice: string |
 // Summarizes the answer and speaks it, with Kokoro when it can and say when not, until `signal` aborts.
 async function say($: EngineInterface, answer: string, voices: Voices, signal: AbortSignal) {
   const askedAt = await $.clock.now()
-  const reply = await $.model.complete({ model: 'haiku', system: SYSTEM, prompt: answer, maxTokens: 150 }, { signal })
+  const reply = await $.model.complete({ model: 'haiku', system: SYSTEM, prompt: `<reply>\n${answer}\n</reply>`, maxTokens: 100 }, { signal })
   const took = seconds((await $.clock.now()) - askedAt)
 
   if (signal.aborted) {
