@@ -7,8 +7,9 @@ import { opening, speakable } from './register'
 const typed = (args = '') =>
   ({ command: 'speak', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } }) as const
 
+let turns = 0
 const answered = (answer: string, extra: { agentId?: string; reason?: 'answer' | 'aborted' | 'error' } = {}) =>
-  ({ answer, durationMs: 1000, isAborted: extra.reason === 'aborted', turnId: 't1', reason: extra.reason ?? 'answer', ...(extra.agentId === undefined ? {} : { agentId: extra.agentId }) }) as const
+  ({ answer, durationMs: 1000, isAborted: extra.reason === 'aborted', turnId: `t${++turns}`, reason: extra.reason ?? 'answer', ...(extra.agentId === undefined ? {} : { agentId: extra.agentId }) }) as const
 
 const ZERO = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 }
 const ran = { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -264,6 +265,28 @@ describe('/speak', () => {
     await say.started()
 
     expect(say.spoken.length).toBe(2)
+    await $.command.run(typed('off'))
+  })
+
+  test('a second loaded copy stays quiet on a turn the first is saying', SAY_ONLY, async ($, on) => {
+    const say = engine(on)
+
+    const turn = answered('Done.')
+    // The other copy claimed the turn first.
+    on('state.get', async ($, e, next) => {
+      const read = await next(e)
+
+      return e.plugin === 'speak' && e.key === 'claimed' && read.value !== undefined
+        ? { value: { ...read.value, value: `${turn.turnId} another-copy` } }
+        : read
+    })
+
+    await $.command.run(typed('on'))
+    await $.turn.complete(turn)
+
+    expect(say.prompts).toEqual([])
+    const log = (await $.command.run(typed('log'))).text ?? ''
+    expect(log).toContain('skipped: another loaded copy of speak is saying this answer')
     await $.command.run(typed('off'))
   })
 

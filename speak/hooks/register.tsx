@@ -8,6 +8,11 @@ const log = atom({ plugin: 'speak', key: 'log' } as const, [])
 const LOG_LINES = 30
 // The last summary spoken, for the replay button; empty before the first.
 const last = atom({ plugin: 'speak', key: 'last' } as const, '')
+// The last turn spoken and the loaded copy that spoke it, as "<turn> <copy>". When a reload
+// leaves two copies of this module in a session, both hear each turn; the first to claim it
+// here speaks, the other stays quiet.
+const claimed = atom({ plugin: 'speak', key: 'claimed' } as const, '')
+const COPY = Math.random().toString(36).slice(2, 10)
 
 const STATUS = '🔊 speaking answers · /speak off'
 const USAGE = 'Usage: /speak [on | off | replay | log]'
@@ -514,6 +519,13 @@ export const register: Register = (on, options) => {
 
     if (e.reason !== 'answer' || answer === '') {
       await note($, `skipped: ${e.reason === 'answer' ? 'nothing to say once code and tables are dropped' : `turn ended by ${e.reason}`}`)
+      return result
+    }
+
+    const claim = `${e.turnId} ${COPY}`
+
+    if ((await update($, claimed, was => (was.startsWith(`${e.turnId} `) ? was : claim))) !== claim) {
+      await note($, `skipped: another loaded copy of speak is saying this answer`)
       return result
     }
 

@@ -1,6 +1,6 @@
 {
   "name": "speak",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "/speak speaks a summary of Claude's answer when a turn ends, in the sessions you turn it on for",
   "author": {
     "name": "Arnold Widjaja"
