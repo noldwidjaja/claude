@@ -178,7 +178,8 @@ export function reportOf(collected: Collected, period: Period): { report: string
 const SYSTEM = `You turn a developer's git commits into a standup update they can paste into a team chat.
 Each project comes as "## name — time"; write it as "**name** (time)", or "**name**" when it has no time.
 Under it, one bullet per commit, in order, rewritten in first person, past tense, plain English:
-what got done and why it matters, not commit jargon. End each bullet with its bracketed time in
+what got done and why it matters, not commit jargon. Keep every detail the commit body gives;
+don't shorten or merge bullets. End each bullet with its bracketed time in
 parentheses, copied exactly, e.g. "(45m)"; leave the time off when it says "no Claude time".
 A "Work in progress" line becomes a bullet saying work continued there, with its time.
 No commit hashes, no preamble, no totals, no sign-off.`
@@ -216,8 +217,9 @@ export const register: Register = (on, options) => {
       model: 'haiku',
       system: SYSTEM,
       prompt: `My commits from ${period.label}:\n\n${report}`,
-      maxTokens: 2048,
-      timeoutMs: 60_000,
+      // The most one reply can hold, so a long week is never cut short.
+      maxTokens: 64_000,
+      timeoutMs: 300_000,
     })
     const summary = reply.isAnswered ? reply.text.trim() : report
     const update = total >= MINUTE ? `${summary}\n\nTotal: ${duration(total)}` : summary
