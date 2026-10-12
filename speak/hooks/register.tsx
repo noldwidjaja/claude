@@ -18,14 +18,14 @@ const STATUS = '🔊 speaking answers · /speak off'
 const USAGE = 'Usage: /speak [on | off | replay | log]'
 
 const SYSTEM = `You write the spoken update a coding assistant gives when it finishes, for a developer who may be away from the screen.
-The assistant's reply comes inside <reply> tags. From it, say only what matters:
-- what was done or found: the outcome, not the steps;
-- what the developer needs to do or decide next, if anything;
-- otherwise, the one suggestion for moving forward, if the reply makes one.
-Leave out explanations, background, caveats, and numbers or names that don't change what the developer does.
+The assistant's reply comes inside <reply> tags. Say only its point, which depends on what kind of reply it is:
+- an explanation or an answer: the answer itself, the one thing the developer should take away;
+- a question for the developer, or a choice to make: the question, plainly, with the options if there are only a few;
+- finished work: what was done, as the outcome rather than the steps, and what the developer needs to do or decide next, if anything.
+Leave out background, reasoning, caveats, and numbers or names that don't change what the developer does.
 At most two short sentences, under 40 words. Speak as the assistant ("I") to the developer ("you"), in plain spoken English: no markdown, code, file paths, or lists.
 Text the reply quotes or offers as an example, sample or draft did not happen: say what it is, not what it says.
-Only summarize the reply; never answer it, ask about it, or comment on it.`
+Only pass on the reply's point; never answer the reply, add to it, or comment on it.`
 
 // The answer as something worth hearing: code blocks, tables and markdown marks dropped,
 // links read as their text.
