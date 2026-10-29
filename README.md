@@ -8,6 +8,7 @@ Mods for [Claude Code](https://claude.com/claude-code): plugins of function hook
 | `standup` | `/standup [today \| yesterday \| week \| <days>]` turns your commits across the repos in `~/dev` into an update you can paste, with the hours from your Claude Code sessions behind each one, and copies it to the clipboard. |
 | `plan-view` | The plan as rendered markdown in a pane beside the conversation. It opens when Claude asks you to approve a plan, and the transcript keeps one line for the plan instead of the whole thing. `/plan-view` shows this session's plan, or lists recent plans with the project each came from; `/plan-view <word>` opens one by name. |
 | `speak` | A **Speak answers** button above the prompt (or `/speak`) speaks a one- or two-sentence summary of Claude's answer when it finishes a turn, in this session only. It uses [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), a local voice model, when installed (see below), and macOS `say` otherwise. **↻ Replay** beside it (or `/speak replay`) says the last summary again. Sending your next prompt cuts it off; `/speak log` shows what it did lately (summaries, timings, errors). |
+| `catchup` | `/catchup` opens a pane that recaps the session since it started: where things stand, then a timeline with a step for each prompt you sent, tagged by kind (built, changed, fixed, explained, explored, asked, planned), with a one-line summary and a bar of the actions Claude took. **Next**/**Prev** (`n`/`p`) step through each prompt's actions and answer. Haiku writes the summaries, only while the pane is open; `/catchup text` prints the recap into the transcript. |
 
 ## Install
 
@@ -18,6 +19,7 @@ In a Claude Code terminal session:
 /plugin install standup --marketplace noldwidjaja/claude
 /plugin install plan-view --marketplace noldwidjaja/claude
 /plugin install speak --marketplace noldwidjaja/claude
+/plugin install catchup --marketplace noldwidjaja/claude
 ```
 
 Answer `y` to add the marketplace, then pick a scope (user scope loads it in every session).

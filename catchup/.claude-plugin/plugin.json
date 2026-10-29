@@ -1,0 +1,7 @@
+{
+  "name": "catchup",
+  "version": "0.5.0",
+  "description": "/catchup steps through what has happened since the session started, one prompt at a time, with where things stand",
+  "author": { "name": "Arnold Widjaja" },
+  "types": "./types/index.d.ts"
+}

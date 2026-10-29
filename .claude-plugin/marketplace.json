@@ -26,6 +26,11 @@
       "name": "speak",
       "source": "./speak",
       "description": "/speak speaks a summary of Claude's answer when a turn ends, in the sessions you turn it on for"
+    },
+    {
+      "name": "catchup",
+      "source": "./catchup",
+      "description": "/catchup steps through what has happened since the session started, one prompt at a time, with where things stand"
     }
   ]
 }
